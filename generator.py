@@ -24,13 +24,10 @@ CAPACITY_LIMIT = max(MAX_SPEC_BROWAR,MAX_SPEC_KARCZMA,MAX_SPEC_POLE) + 10  # dom
 EXTRA_EDGES_RANDOM = 2*n  # liczba dodatkowych losowych polaczen
 
 l = ceil(sqrt(n * r**2))  # rozmiar mapy
-
+global_id = 0
 
 #---pliki----
-browary = open("browary.txt","w") #1
-karczmy = open("karczmy.txt","w") #2
-pola_uprawne = open("pola_uprawne.txt","w") #3
-skrzyzowania = open("skrzyzowania.txt","w") #4
+struktury = open("struktury.txt","w")
 drogi = open("drogi.txt","w")
 
 
@@ -42,39 +39,36 @@ krawedzie_miedzy_skrzyzowaniami = []
 licznik_krawedzi_skrzyzowan = {}
 zestaw_polaczen = set()
 
-def create_rand(i, typ): #generowanie struktur 
+def create_rand(typ): #generowanie struktur 
+    global global_id
     x,y = randint(0,l),randint(0,l)
     while([x,y]) in koordynat:
         x,y = randint(0,l),randint(0,l)
     koordynat.append([x,y])
-    id = f"{i:03}{typ}"
+    id = f"{global_id:03}{typ}"
+    global_id+=1
     match(typ):
         case "1": #browary
             spec = randint(MIN_SPEC_BROWAR,MAX_SPEC_BROWAR)
-            browary.write(f'{spec} {x} {y} {id}\n')
             lista_nieskrzyzowan.append([id,x,y])
         case "2": #karczmy
             spec = randint(MIN_SPEC_KARCZMA,MAX_SPEC_KARCZMA)
-            karczmy.write(f'{spec} {x} {y} {id}\n')
             lista_nieskrzyzowan.append([id,x,y])
         case "3": #pola_uprawne
             spec = randint(MIN_SPEC_POLE,MAX_SPEC_POLE)
-            pola_uprawne.write(f'{spec} {x} {y} {id}\n')
             lista_nieskrzyzowan.append([id,x,y])
         case "4": #skrzyzowania
-            skrzyzowania.write(f'{x} {y} {id}\n')
+            spec = 0
             lista_skrzyzowan.append([id,x,y])
+    struktury.write(f'{x} {y} {id} {spec} \n')
 
 
 def create_struct(n): #petle na generowanie struktur
-    for i in range(n//2):create_rand(i, "1") #browar
-    for i in range(round(n*.8)):create_rand(i, "2") #karczma
-    for i in range(n):create_rand(i, "3") #pola uprawne
-    for i in range(2*n):create_rand(i, "4") #skrzyzowania
-    browary.close()
-    karczmy.close()
-    pola_uprawne.close()
-    skrzyzowania.close()
+    for i in range(n//2):create_rand("1") #browar
+    for i in range(round(n*.8)):create_rand("2") #karczma
+    for i in range(n):create_rand("3") #pola uprawne
+    for i in range(2*n):create_rand("4") #skrzyzowania
+    struktury.close()
 
 def connect_to_crossroads(): #podlaczanie struktur do skrzyzowan
     for i in lista_nieskrzyzowan:
