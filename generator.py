@@ -123,6 +123,7 @@ def connect_crossroads(): #MST + extra + filtr
             id_a, id_b = a[0], b[0]
             a_id, b_id = sorted([id_a, id_b])
             if (a_id, b_id) not in zestaw_polaczen:
+                przepustowosc = randint(CROSS_CAPACITY_MIN, CROSS_CAPACITY_MAX)
                 zestaw_polaczen.add((a_id, b_id))
                 krawedzie_miedzy_skrzyzowaniami.append((a_id, b_id, przepustowosc))
                 licznik_krawedzi_skrzyzowan[a_id] += 1
