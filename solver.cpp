@@ -1,64 +1,71 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
-#include <iterator>
-#include <map>
+#include <unordered_map>
+#include <string>
 
 using namespace std;
 
 class Vertex {
-private:
-	int x, y;
-	unsigned int id;
-	unsigned int spec;
-	char type;
 public:
-	friend ostream& operator<<(ostream& out, Vertex& v);
+    string global_id;
+    int x, y;
+    int type;
+    int spec;
 
-	Vertex() {}
-
-	Vertex(int p_x, int p_y, unsigned int p_id, unsigned int p_spec) : x(p_x), y(p_y), id(p_id), spec(p_spec) {
-		switch (id) {
-
-		}
-	}
-
-	inline void setType(char type) { this->type = type; }
+    Vertex(string id, int x, int y, int spec)
+        : global_id(id), x(x), y(y), spec(spec) {
+        type = global_id.back() - '0';
+    }
 };
 
-ostream& operator<<(ostream& out, Vertex& v) {
-	out << "(" << v.x << ", " << v.y << "), id: " << v.id << ", spec: " << v.spec << ", typ: " << v.type << endl;
-	return out;
-}
+class Edge {
+public:
+    int from, to;
+    int capacity;
+    int flow;
+    int rev; // indeks krawedzi powrotnej;
 
-vector<Vertex> loadFileData(string file_name) {
-	vector<Vertex> data;
-	ifstream input_file;
-	input_file.open(file_name);
-	int t_x, t_y;
-	unsigned t_id, t_spec;
-	while (input_file >> t_x >> t_y >> t_id >> t_spec) {
-		Vertex temp(t_x, t_y, t_id, t_spec);
-		data.emplace_back(temp);
-	}
-}
+    Edge(int f, int t, int c, int fl, int r) : from(f), to(t), capacity(c), flow(fl), rev(r) {}
+};
 
-template<typename T>
-void printVector(vector<T> vec) {
-	for (auto it = begin(vec), it != end(vec); it++) {
-		cout << *it;
-	}
-}
+class Graph {
+public:
+    unordered_map<string, int> idToIndex;
+    vector<string> indexToId;
+    vector<Vertex> vertices;
+    vector<vector<Edge>> adjList;
 
-void initTypesDict(map<int, char> typemap) {
-	typemap.insert({ 1, 'b' });
-	typemap.insert({ 2, 'k' });
-	typemap.insert({ 3, 'p' });
-	typemap.insert({ 4, 's' });
+    void addVertex(Vertex v) {
+        idToIndex[v.global_id] = vertices.size();
+        indexToId.push_back(v.global_id);
+        vertices.push_back(v);
+        adjList.emplace_back();
+    }
+
+    void addEdgeById(const string& fromId, const string& toId, int capacity) {
+        int u = idToIndex[fromId];
+        int v = idToIndex[toId];
+        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size());
+        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1); 
+
+    }
+};
+
+void loadVertices(Graph& g, const string& filename) {
+    ifstream in(filename);
+    string line;
+    while (getline(in, line)) {
+        stringstream ss(line);
+        int x, y, spec;
+        string id;
+        ss >> x >> y >> id >> spec;
+        g.addVertex(Vertex(id, x, y, spec));
+    }
 }
 
 int main() {
-	map<int, char> typemap;
-	
-	return 0;
+    
+    return 0;
 }
