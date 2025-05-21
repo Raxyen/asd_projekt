@@ -1,5 +1,6 @@
-from random import randint,sample, seed
-from math import ceil,sqrt 
+from random import randint, sample, seed
+from math import ceil, sqrt, cos, sin, pi
+
 #---config---
 seed(2137)
 n = 3 # liczba pol uprawnych
@@ -23,8 +24,22 @@ CAPACITY_LIMIT = max(MAX_SPEC_BROWAR,MAX_SPEC_KARCZMA,MAX_SPEC_POLE) + 10  # dom
 
 EXTRA_EDGES_RANDOM = 2*n  # liczba dodatkowych losowych polaczen
 
+ZNISZCZONE_DROGI_PERCENTAGE = 20 # jak nazwa sugeruje, szansa na to ze droga bedzie zniszczona
+MIN_KOSZT_NAPRAWY_DROGI = 0
+MAX_KOSZT_NAPRAWY_DROGI= 100
+
 l = ceil(sqrt(n * r**2))  # rozmiar mapy
 global_id = 0
+
+# ---limitacja cwiartek ---
+PODZIAL_X = 2
+PODZIAL_Y = 2
+WIELOKATY_LICZBA = PODZIAL_X * PODZIAL_Y
+MIN_PUNKTOW =10
+MAX_PUNKTOW = 30
+
+MIN_BOOST_CWIARTKI = 110
+MAX_BOOST_CWIARTKI = 200
 
 #---pliki----
 struktury = open("struktury.txt","w")
@@ -75,7 +90,8 @@ def connect_to_crossroads(): #podlaczanie struktur do skrzyzowan
         struct_id,struct_x,struct_y = i
         najblizsze = min(lista_skrzyzowan,key = lambda x:(struct_x-x[1])**2+(struct_y-x[2])**2)
         skrzyz_id = najblizsze[0]
-        drogi.write(f'{struct_id} {skrzyz_id} {CAPACITY_LIMIT}\n')
+        przepustowosc = randint(CROSS_CAPACITY_MIN, CROSS_CAPACITY_MAX)
+        drogi.write(f'{skrzyz_id} {struct_id} {CAPACITY_LIMIT} {0}\n')
         licznik_krawedzi_skrzyzowan[skrzyz_id]+=1
 
 def connect_crossroads(): #MST + extra + filtr 
@@ -115,6 +131,7 @@ def connect_crossroads(): #MST + extra + filtr
         krawedzie_miedzy_skrzyzowaniami.append((a, b, przepustowosc))
         licznik_krawedzi_skrzyzowan[a]+=1
         licznik_krawedzi_skrzyzowan[b]+=1
+        zestaw_polaczen.add(tuple(sorted([a, b])))
 
     # Dodatkowe losowe połączenia 
     for _ in range(EXTRA_EDGES_RANDOM):
@@ -132,23 +149,53 @@ def connect_crossroads(): #MST + extra + filtr
     #upewnianie sie ze nie ma pustych zaulkow
     for skrzyz_id in licznik_krawedzi_skrzyzowan:
         if licznik_krawedzi_skrzyzowan[skrzyz_id] == 1:
-            kandydaci = [x[0] for x in lista_skrzyzowan if x[0] != skrzyz_id and sorted([skrzyz_id,x[0]])not in zestaw_polaczen]
+            kandydaci = [x[0] for x in lista_skrzyzowan if x[0] != skrzyz_id and tuple(sorted([skrzyz_id, x[0]])) not in zestaw_polaczen]
             if kandydaci:
                 partner = sample(kandydaci, 1)[0]
                 a_id, b_id = sorted([skrzyz_id, partner])
-                zestaw_polaczen.add((a_id, b_id))
+                zestaw_polaczen.add(tuple(sorted([a_id, b_id])))
                 przepustowosc = randint(CROSS_CAPACITY_MIN, CROSS_CAPACITY_MAX)
                 krawedzie_miedzy_skrzyzowaniami.append((a_id, b_id, przepustowosc))
                 licznik_krawedzi_skrzyzowan[a_id] += 1
                 licznik_krawedzi_skrzyzowan[b_id] += 1
                 
     for a, b, p in krawedzie_miedzy_skrzyzowaniami:
-        drogi.write(f'{a} {b} {p}\n')
+        zniszczenie = 0
+        if randint(0,100)<ZNISZCZONE_DROGI_PERCENTAGE:
+            zniszczenie = randint(MIN_KOSZT_NAPRAWY_DROGI,MAX_KOSZT_NAPRAWY_DROGI)
+        drogi.write(f'{a} {b} {p} {zniszczenie}\n')
 
+def generate_wielokaty_wypukle():
+    with open("cwiartki.txt", "w") as f:
+        counter = 0
+        for i in range(PODZIAL_Y):
+            for j in range(PODZIAL_X):
+                if counter >= WIELOKATY_LICZBA:
+                    return
 
+                xmin=j*(l//PODZIAL_X)
+                xmax=(j+ 1)*(l//PODZIAL_X)
+                ymin=i*(l//PODZIAL_Y)
+                ymax=(i+1)*(l//PODZIAL_Y)
+
+                cx=(xmin+xmax)//2
+                cy=(ymin+ymax)//2
+                polygon_r=min((xmax-xmin),(ymax-ymin))//2
+
+                n=randint(MIN_PUNKTOW, MAX_PUNKTOW)
+                angles=sorted([randint(0,360) for _ in range(n)])
+                points=[
+                    ((cx+polygon_r*cos(a*pi/180)),(cy + polygon_r*sin(a*pi/180)))
+                    for a in angles
+                ]
+                boost = round(randint(110, 140)/100, 2)
+                line = f"{boost} "+" ".join(f"{x} {y}" for x, y in points)
+                f.write(line + "\n")
+                counter += 1
 
 create_struct(n)
 licznik_krawedzi_skrzyzowan = {i[0]:0 for i in lista_skrzyzowan}
 connect_to_crossroads()
 connect_crossroads()
+generate_wielokaty_wypukle()
 drogi.close()
