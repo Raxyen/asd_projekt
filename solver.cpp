@@ -6,6 +6,7 @@
 #include <string>
 #include <queue>
 #include <climits>
+#include <unordered_set>
 using namespace std;
 
 
@@ -28,10 +29,8 @@ public:
     int capacity;
     int flow;
     int rev; // indeks krawędzi odwrotnej (w liście sąsiedztwa wierzchołka 'to')
-    int cost; // koszt naprawy drogi (lub koszt przepływu przez krawędź)
 
-    Edge(int f, int t, int c, int fl, int r, int cost = 0)
-            : from(f), to(t), capacity(c), flow(fl), rev(r), cost(cost) {}
+    Edge(int f, int t, int c, int fl, int r) : from(f), to(t), capacity(c), flow(fl), rev(r) {}
 };
 
 class Graph {
@@ -49,13 +48,61 @@ public:
         adjList.emplace_back();  // dodaj pustą listę sąsiedztwa
     }
 
-    void addEdgeById(const string& fromId, const string& toId, int capacity, int cost = 0) {
+    void addEdgeById(const string& fromId, const string& toId, int capacity) {
         int u = idToIndex[fromId];
         int v = idToIndex[toId];
-        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size(), cost);
-        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1, -cost); // koszt odwrotny = -cost
+        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size());
+        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1); // krawędź odwrotna
     }
+
+    void splitVertex() {
+        vector<Vertex> breweries;
+
+        for (const Vertex& v : vertices) {
+            if (v.type == 3 || v.type == 1) { //pola i browary
+                breweries.push_back(v);
+            }
+        }
+
+        for (const Vertex& v : breweries) {
+            string originalId = v.global_id;
+            int originalIndex = idToIndex[originalId];
+
+            string inId = originalId + "In";
+            string outId = originalId + "Out";
+
+            // dodajemy nowe wieszcholki
+            addVertex(Vertex(inId, v.x, v.y, v.spec));
+            addVertex(Vertex(outId, v.x + 10, v.y, v.spec));
+
+            addEdgeById(inId, outId, v.spec);
+            addEdgeById(outId, inId, v.spec);
+
+            //do browara
+            for (int u = 0; u < adjList.size(); ++u) {
+                for (Edge& e : adjList[u]) {
+                    if (e.to == originalIndex) {
+                        string fromId = indexToId[e.from];
+                        addEdgeById(fromId, inId, e.capacity);
+                        e.capacity = 0;
+                    }
+                }
+            }
+
+            //od browara
+            for (Edge& e : adjList[originalIndex]) {
+                string toId = indexToId[e.to];
+                addEdgeById(outId, toId, e.capacity);
+                e.capacity = 0;
+            }
+        }
+    }
+
+
+
+
 };
+
 
 void loadVertices(Graph& g, const string& filename) {
     ifstream in(filename);
@@ -85,17 +132,18 @@ void loadEdges(Graph& g, const string& filename) {
     while (getline(in, line)) {
         stringstream ss(line);
         string fromId, toId;
-        int capacity, cost;
-        ss >> fromId >> toId >> capacity >> cost; // teraz plik zawiera koszt w 4. kolumnie
+        int capacity;
+        ss >> fromId >> toId >> capacity;
 
         if (g.idToIndex.count(fromId) == 0 || g.idToIndex.count(toId) == 0) {
             cerr << "Uwaga: jeden z wierzchołków nie istnieje: " << fromId << " lub " << toId << endl;
             continue;
         }
 
-        g.addEdgeById(fromId, toId, capacity, cost);
+        g.addEdgeById(fromId, toId, capacity);
     }
 }
+
 
 int bfs(Graph& g, int s, int t, vector<int>& parent, vector<int>& parentEdgeIndex) {
     fill(parent.begin(), parent.end(), -1);
@@ -138,6 +186,8 @@ int edmondsKarp(Graph& g, const string& sourceId, const string& sinkId) {
             pathFlow = min(pathFlow, e.capacity - e.flow);
         }
 
+
+
         // Aktualizujemy przepływy na ścieżce
         for (int v = t; v != s; v = parent[v]) {
             int u = parent[v];
@@ -146,74 +196,16 @@ int edmondsKarp(Graph& g, const string& sourceId, const string& sinkId) {
             g.adjList[e.to][e.rev].flow -= pathFlow; // odejmujemy w odwrotnej krawędzi
         }
 
+
         maxFlow += pathFlow;
     }
 
     return maxFlow;
 }
 
-int minCostFlow(Graph& g, const string& sourceId, const string& sinkId, int requiredFlow, int& totalCost) {
-    int n = g.vertices.size();
-    int s = g.idToIndex[sourceId];
-    int t = g.idToIndex[sinkId];
-    vector<int> potential(n, 0);
-    totalCost = 0;
-    int flow = 0;
 
-    while (flow < requiredFlow) {
-        vector<int> dist(n, INT_MAX);
-        vector<int> parent(n, -1);
-        vector<int> parentEdgeIndex(n, -1);
-        priority_queue<pair<int, int>, vector<pair<int, int>>, greater<>> pq;
 
-        dist[s] = 0;
-        pq.emplace(0, s);
 
-        while (!pq.empty()) {
-            auto [d, u] = pq.top(); pq.pop();
-            if (d > dist[u]) continue;
-
-            for (int i = 0; i < g.adjList[u].size(); ++i) {
-                Edge& e = g.adjList[u][i];
-                if (e.capacity > e.flow) {
-                    int v = e.to;
-                    int newDist = dist[u] + e.cost + potential[u] - potential[v];
-                    if (newDist < dist[v]) {
-                        dist[v] = newDist;
-                        parent[v] = u;
-                        parentEdgeIndex[v] = i;
-                        pq.emplace(dist[v], v);
-                    }
-                }
-            }
-        }
-
-        if (parent[t] == -1) break; // nie da się już nic przepchnąć
-
-        for (int i = 0; i < n; ++i)
-            if (dist[i] < INT_MAX)
-                potential[i] += dist[i];
-
-        int pathFlow = requiredFlow - flow;
-        for (int v = t; v != s; v = parent[v]) {
-            int u = parent[v];
-            Edge& e = g.adjList[u][parentEdgeIndex[v]];
-            pathFlow = min(pathFlow, e.capacity - e.flow);
-        }
-
-        for (int v = t; v != s; v = parent[v]) {
-            int u = parent[v];
-            Edge& e = g.adjList[u][parentEdgeIndex[v]];
-            e.flow += pathFlow;
-            g.adjList[e.to][e.rev].flow -= pathFlow;
-            totalCost += pathFlow * e.cost;
-        }
-
-        flow += pathFlow;
-    }
-
-    return flow;
-}
 
 //тут правильно
 int main() {
@@ -223,20 +215,29 @@ int main() {
     loadVertices(g, "D:\\DataUser\\Downloads\\struktury.txt");
     loadEdges(g, "D:\\DataUser\\Downloads\\drogi.txt");
 
+
+    // Добавим искусственный исток и сток
     g.addVertex(Vertex("SOURCE", 0, 0, 0));
     g.addVertex(Vertex("SINK", 0, 0, 0));
 
-    for (const Vertex& v : g.vertices) {
+    for (Vertex& v : g.vertices) {
         if (v.global_id == "SOURCE" || v.global_id == "SINK") continue;
 
-        if (v.type == 3) { // pole
+        if (v.type == 3) { // pole — источник
             g.addEdgeById("SOURCE", v.global_id, v.spec); // spec = сколько производит
         }
-        else if (v.type == 2) { // karczma
+        else if (v.type == 2) { // karczma — потребитель
             g.addEdgeById(v.global_id, "SINK", INT_MAX); // можно ограничить если надо
         }
+
+
+
     }
-    
+
+
+
+    g.splitVertex();
+
     // Sprawdzenie: wypisz wszystkie wierzchołki i ich sąsiadów
     for (int i = 0; i < g.vertices.size(); i++) {
         cout << g.indexToId[i] << " (" << g.vertices[i].x << "," << g.vertices[i].y << ") -> ";
@@ -261,17 +262,14 @@ int main() {
         }
     }
 
-    int maxFlow = edmondsKarp(g, "SOURCE", "SINK");
-    cout << "Maksymalny przeplyw (bez kosztow): " << maxFlow << endl;
 
-// resetujemy flow w grafie do 0 aby znowu go użyć
-    for (auto& edges : g.adjList)
-        for (auto& e : edges)
-            e.flow = 0;
+    cout << "Maksymalny przeplyw: " << edmondsKarp(g, "SOURCE", "SINK") << endl;
+    // cout << "Maksymalny przeplyw: " << edmondsKarp(g, "0003", "0052") << endl;
 
-    int totalRepairCost = 0;
-    int achievedFlow = minCostFlow(g, "SOURCE", "SINK", maxFlow, totalRepairCost);
 
-    cout << "Koszt naprawy drog potrzebnych do osiagniecia przeplywu: " << totalRepairCost << endl;
+
+
+
     return 0;
 }
+
