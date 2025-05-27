@@ -55,52 +55,56 @@ public:
         adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1); // krawędź odwrotna
     }
 
-    void splitVertex() {
-        vector<Vertex> breweries;
-
-        for (const Vertex& v : vertices) {
-            if (v.type == 3 || v.type == 1) { //pola i browary
-                breweries.push_back(v);
+    void splitVertices() {
+        vector<int> toSplitIdx;
+        for (int i = 0; i < vertices.size(); ++i) {
+            if (vertices[i].type == 3 || vertices[i].type == 1) {
+                toSplitIdx.push_back(i);
             }
         }
-
-        for (const Vertex& v : breweries) {
-            string originalId = v.global_id;
-            int originalIndex = idToIndex[originalId];
-
-            string inId = originalId + "In";
-            string outId = originalId + "Out";
-
-            // dodajemy nowe wieszcholki
-            addVertex(Vertex(inId, v.x, v.y, v.spec));
-            addVertex(Vertex(outId, v.x + 10, v.y, v.spec));
-
-            addEdgeById(inId, outId, v.spec);
-            addEdgeById(outId, inId, v.spec);
-
-            //do browara
+        struct Info { int idx; string id; int x, y, spec; };
+        vector<Info> infos;
+        infos.reserve(toSplitIdx.size());
+        for (int idx : toSplitIdx) {
+            const Vertex& v = vertices[idx];
+            infos.push_back({ idx, v.global_id, v.x, v.y, v.spec });
+        }
+        for (const auto& info : infos) {
+            string inId = info.id + "In";
+            string outId = info.id + "Out";
+            addVertex(Vertex(inId, info.x, info.y, info.spec));
+            addVertex(Vertex(outId, info.x, info.y, info.spec));
+            vector<pair<string, int>> incoming, outgoing;
             for (int u = 0; u < adjList.size(); ++u) {
-                for (Edge& e : adjList[u]) {
-                    if (e.to == originalIndex) {
-                        string fromId = indexToId[e.from];
-                        addEdgeById(fromId, inId, e.capacity);
+                for (auto& e : adjList[u]) {
+                    if (e.to == info.idx && e.capacity > 0) {
+                        incoming.emplace_back(indexToId[u], e.capacity);
+                    }
+                }
+            }
+            for (auto& e : adjList[info.idx]) {
+                if (e.capacity > 0) {
+                    outgoing.emplace_back(indexToId[e.to], e.capacity);
+                }
+            }
+            addEdgeById(inId, outId, info.spec);
+            for (auto& p : incoming) addEdgeById(p.first, inId, p.second);
+            for (auto& p : outgoing) addEdgeById(outId, p.first, p.second);
+
+            // zerujemy capacity podzielionych wierzcholkow
+            for (auto& e : adjList[info.idx]) {
+                e.capacity = 0;
+            }
+            for (int u = 0; u < adjList.size(); ++u) {
+                for (auto& e : adjList[u]) {
+                    if (e.to == info.idx) {
                         e.capacity = 0;
                     }
                 }
             }
-
-            //od browara
-            for (Edge& e : adjList[originalIndex]) {
-                string toId = indexToId[e.to];
-                addEdgeById(outId, toId, e.capacity);
-                e.capacity = 0;
-            }
         }
     }
-
-
-
-
+    
 };
 
 
@@ -204,39 +208,31 @@ int edmondsKarp(Graph& g, const string& sourceId, const string& sinkId) {
 }
 
 
-
-
-
 //тут правильно
 int main() {
     Graph g;
-
-    // Podaj ścieżki do plików z danymi
+  
     loadVertices(g, "D:\\DataUser\\Downloads\\struktury.txt");
     loadEdges(g, "D:\\DataUser\\Downloads\\drogi.txt");
 
-
-    // Добавим искусственный исток и сток
     g.addVertex(Vertex("SOURCE", 0, 0, 0));
     g.addVertex(Vertex("SINK", 0, 0, 0));
 
     for (Vertex& v : g.vertices) {
         if (v.global_id == "SOURCE" || v.global_id == "SINK") continue;
 
-        if (v.type == 3) { // pole — источник
-            g.addEdgeById("SOURCE", v.global_id, v.spec); // spec = сколько производит
+        if (v.type == 3) { // pole
+            g.addEdgeById("SOURCE", v.global_id, v.spec); 
         }
-        else if (v.type == 2) { // karczma — потребитель
-            g.addEdgeById(v.global_id, "SINK", INT_MAX); // можно ограничить если надо
+        else if (v.type == 2) { // karczma
+            g.addEdgeById(v.global_id, "SINK", INT_MAX);=
         }
 
 
 
     }
 
-
-
-    g.splitVertex();
+    g.splitVertices();
 
     // Sprawdzenie: wypisz wszystkie wierzchołki i ich sąsiadów
     for (int i = 0; i < g.vertices.size(); i++) {
@@ -264,12 +260,6 @@ int main() {
 
 
     cout << "Maksymalny przeplyw: " << edmondsKarp(g, "SOURCE", "SINK") << endl;
-    // cout << "Maksymalny przeplyw: " << edmondsKarp(g, "0003", "0052") << endl;
-
-
-
-
-
+    
     return 0;
 }
-
