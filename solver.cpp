@@ -29,8 +29,10 @@ public:
     int capacity;
     int flow;
     int rev; // indeks krawędzi odwrotnej (w liście sąsiedztwa wierzchołka 'to')
+    int cost; // koszt naprawy drogi (lub koszt przepływu przez krawędź)
 
-    Edge(int f, int t, int c, int fl, int r) : from(f), to(t), capacity(c), flow(fl), rev(r) {}
+    Edge(int f, int t, int c, int fl, int r, int cost = 0)
+    : from(f), to(t), capacity(c), flow(fl), rev(r), cost(cost) {}
 };
 
 class Graph {
@@ -48,59 +50,67 @@ public:
         adjList.emplace_back();  // dodaj pustą listę sąsiedztwa
     }
 
-    void addEdgeById(const string& fromId, const string& toId, int capacity) {
+    void addEdgeById(const string& fromId, const string& toId, int capacity, int cost = 0) {
         int u = idToIndex[fromId];
         int v = idToIndex[toId];
-        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size());
-        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1); // krawędź odwrotna
+        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size(), cost);
+        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1, -cost); // krawędź odwrotna
     }
 
-    void splitVertex() {
-        vector<Vertex> breweries;
-
-        for (const Vertex& v : vertices) {
-            if (v.type == 3 || v.type == 1) { //pola i browary
-                breweries.push_back(v);
+    //dzielimy pola i browary, ale do browarów IN i OUT nie robimy dróg
+    void splitVertices() {
+        vector<int> toSplitIdx;
+        for (int i = 0; i < vertices.size(); ++i) {
+            if (vertices[i].type == 3 || vertices[i].type == 1 ) {
+                toSplitIdx.push_back(i);
             }
         }
-
-        for (const Vertex& v : breweries) {
-            string originalId = v.global_id;
-            int originalIndex = idToIndex[originalId];
-
-            string inId = originalId + "In";
-            string outId = originalId + "Out";
-
-            // dodajemy nowe wieszcholki
-            addVertex(Vertex(inId, v.x, v.y, v.spec));
-            addVertex(Vertex(outId, v.x + 10, v.y, v.spec));
-
-            addEdgeById(inId, outId, v.spec);
-            addEdgeById(outId, inId, v.spec);
-
-            //do browara
+        struct Info { int idx; string id; int x, y, spec, type; };
+        vector<Info> infos;
+        infos.reserve(toSplitIdx.size());
+        for (int idx : toSplitIdx) {
+            const Vertex& v = vertices[idx];
+            infos.push_back({ idx, v.global_id, v.x, v.y, v.spec, v.type });
+        }
+        for (const auto& info : infos) {
+            string inId = info.id + "In";
+            string outId = info.id + "Out";
+            addVertex(Vertex(inId, info.x, info.y, info.spec));
+            addVertex(Vertex(outId, info.x, info.y, info.spec));
+            vector<pair<string, int>> incoming, outgoing;
+            //krawędzie wchodzące 
             for (int u = 0; u < adjList.size(); ++u) {
-                for (Edge& e : adjList[u]) {
-                    if (e.to == originalIndex) {
-                        string fromId = indexToId[e.from];
-                        addEdgeById(fromId, inId, e.capacity);
-                        e.capacity = 0;
+                for (auto& e : adjList[u]) {
+                    if (e.to == info.idx && e.capacity > 0) {
+                        incoming.emplace_back(indexToId[u], e.capacity);
                     }
                 }
             }
+            // krawędzie wychodzące
+            for (auto& e : adjList[info.idx]) {
+                if (e.capacity > 0) {
+                    outgoing.emplace_back(indexToId[e.to], e.capacity);
+                }
+            }
+            // łączymy pola IN i OUT
+            if (info.type == 3) {
+                addEdgeById(inId, outId, info.spec);
+            }
+            
+            for (auto& p : incoming) addEdgeById(p.first, inId, p.second);
+            for (auto& p : outgoing) addEdgeById(outId, p.first, p.second);
 
-            //od browara
-            for (Edge& e : adjList[originalIndex]) {
-                string toId = indexToId[e.to];
-                addEdgeById(outId, toId, e.capacity);
+            // zerujemy capasity pojemności oryginalnej wierzchołka, żeby "skasować drogę"
+            for (auto& e : adjList[info.idx]) {
                 e.capacity = 0;
+            }
+            for (auto& edges : adjList) {
+                for (auto& e : edges) {
+                    if (e.to == info.idx) e.capacity = 0;
+                }
             }
         }
     }
-
-
-
-
 };
 
 
@@ -132,15 +142,15 @@ void loadEdges(Graph& g, const string& filename) {
     while (getline(in, line)) {
         stringstream ss(line);
         string fromId, toId;
-        int capacity;
-        ss >> fromId >> toId >> capacity;
+        int capacity, cost;
+        ss >> fromId >> toId >> capacity >> cost;
 
         if (g.idToIndex.count(fromId) == 0 || g.idToIndex.count(toId) == 0) {
             cerr << "Uwaga: jeden z wierzchołków nie istnieje: " << fromId << " lub " << toId << endl;
             continue;
         }
 
-        g.addEdgeById(fromId, toId, capacity);
+        g.addEdgeById(fromId, toId, capacity, cost);
     }
 }
 
@@ -216,27 +226,44 @@ int main() {
     loadEdges(g, "D:\\DataUser\\Downloads\\drogi.txt");
 
 
-    // Добавим искусственный исток и сток
+    g.splitVertices();
+
+    // dodajemy zródłą i ujścia
     g.addVertex(Vertex("SOURCE", 0, 0, 0));
     g.addVertex(Vertex("SINK", 0, 0, 0));
+    g.addVertex(Vertex("SOURCEBREWERY", 0, 0, 0));
+    g.addVertex(Vertex("SINKBREWERY", 0, 0, 0));
 
-    for (Vertex& v : g.vertices) {
-        if (v.global_id == "SOURCE" || v.global_id == "SINK") continue;
-
-        if (v.type == 3) { // pole — источник
-            g.addEdgeById("SOURCE", v.global_id, v.spec); // spec = сколько производит
+    // łączymy zródło SOURCE z wierzchołkami pol IN
+    for (const auto& v : g.vertices) {
+        if (v.global_id == "SOURCE" || v.global_id == "SINK" || v.global_id == "SOURCEBREWERY" || v.global_id == "SINKBREWERY") continue;
+        // Only consider 'In' vertices for type 3
+        if (v.global_id.size() > 2 && v.global_id.substr(v.global_id.size() - 2) == "In" &&
+            v.global_id[v.global_id.size() - 3] == '3') {
+            g.addEdgeById("SOURCE", v.global_id, v.spec);
         }
-        else if (v.type == 2) { // karczma — потребитель
-            g.addEdgeById(v.global_id, "SINK", INT_MAX); // можно ограничить если надо
-        }
-
-
-
     }
 
+    // łączymy ujście SINK z karczmami
+    for (const auto& v : g.vertices) {
+        if (v.type == 2)
+            g.addEdgeById(v.global_id, "SINK", INT_MAX); 
+    }
 
+    // łączymy browary IN z SOURCEBREWERY i SINKBREWERY z browarami OUT
+    for (const auto& v : g.vertices) {
+        if (v.global_id.size() > 2 && v.global_id.substr(v.global_id.size() - 2) == "In" &&
+            v.global_id[v.global_id.size() - 3] == '1') {
+            g.addEdgeById(v.global_id, "SOURCEBREWERY", v.spec);
+        }
+        if (v.global_id.size() > 3 && v.global_id.substr(v.global_id.size() - 3) == "Out" &&
+            v.global_id[v.global_id.size() - 4] == '1') {
+            g.addEdgeById("SINKBREWERY", v.global_id, v.spec);
+        }
+    }
 
-    g.splitVertex();
+    int maxJeczmien = edmondsKarp(g, "SOURCE", "SOURCEBREWERY"); // maksymalna ilosc jęczmienia, którą można dostarczyć do browarów
+    g.addEdgeById("SOURCEBREWERY" , "SINKBREWERY", maxJeczmien/2); // zmiana capasity drogi, bo z 1 kg jęczmienia zyskujemy 0,5 piwa
 
     // Sprawdzenie: wypisz wszystkie wierzchołki i ich sąsiadów
     for (int i = 0; i < g.vertices.size(); i++) {
@@ -263,13 +290,8 @@ int main() {
     }
 
 
-    cout << "Maksymalny przeplyw: " << edmondsKarp(g, "SOURCE", "SINK") << endl;
-    // cout << "Maksymalny przeplyw: " << edmondsKarp(g, "0003", "0052") << endl;
-
-
-
-
-
+    cout << "Maksymalny przeplyw jeczmienia: " << maxJeczmien << endl;
+    cout << "Maksymalny przeplyw piwa (nasz wynik): " << edmondsKarp(g, "SOURCEBREWERY", "SINK") << endl;
+  
     return 0;
 }
-
