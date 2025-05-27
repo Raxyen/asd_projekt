@@ -29,8 +29,10 @@ public:
     int capacity;
     int flow;
     int rev; // indeks krawędzi odwrotnej (w liście sąsiedztwa wierzchołka 'to')
+    int cost; // koszt naprawy drogi (lub koszt przepływu przez krawędź)
 
-    Edge(int f, int t, int c, int fl, int r) : from(f), to(t), capacity(c), flow(fl), rev(r) {}
+    Edge(int f, int t, int c, int fl, int r, int cost = 0)
+    : from(f), to(t), capacity(c), flow(fl), rev(r), cost(cost) {}
 };
 
 class Graph {
@@ -48,11 +50,11 @@ public:
         adjList.emplace_back();  // dodaj pustą listę sąsiedztwa
     }
 
-    void addEdgeById(const string& fromId, const string& toId, int capacity) {
+    void addEdgeById(const string& fromId, const string& toId, int capacity, int cost = 0) {
         int u = idToIndex[fromId];
         int v = idToIndex[toId];
-        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size());
-        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1); // krawędź odwrotna
+        adjList[u].emplace_back(u, v, capacity, 0, adjList[v].size(), cost);
+        adjList[v].emplace_back(v, u, 0, 0, adjList[u].size() - 1, -cost); // krawędź odwrotna
     }
 
     //dzielimy pola i browary, ale do browarów IN i OUT nie robimy dróg
@@ -140,15 +142,15 @@ void loadEdges(Graph& g, const string& filename) {
     while (getline(in, line)) {
         stringstream ss(line);
         string fromId, toId;
-        int capacity;
-        ss >> fromId >> toId >> capacity;
+        int capacity, cost;
+        ss >> fromId >> toId >> capacity >> cost;
 
         if (g.idToIndex.count(fromId) == 0 || g.idToIndex.count(toId) == 0) {
             cerr << "Uwaga: jeden z wierzchołków nie istnieje: " << fromId << " lub " << toId << endl;
             continue;
         }
 
-        g.addEdgeById(fromId, toId, capacity);
+        g.addEdgeById(fromId, toId, capacity, cost);
     }
 }
 
