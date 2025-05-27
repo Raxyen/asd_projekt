@@ -160,18 +160,16 @@ int main() {
     loadVertices(g, "D:\\DataUser\\Downloads\\struktury.txt");
     loadEdges(g, "D:\\DataUser\\Downloads\\drogi.txt");
 
-
-    // Добавим искусственный исток и сток
     g.addVertex(Vertex("SOURCE", 0, 0, 0));
     g.addVertex(Vertex("SINK", 0, 0, 0));
 
     for (const Vertex& v : g.vertices) {
         if (v.global_id == "SOURCE" || v.global_id == "SINK") continue;
 
-        if (v.type == 3) { // pole — источник
+        if (v.type == 3) { // pole 
             g.addEdgeById("SOURCE", v.global_id, v.spec); // spec = сколько производит
         }
-        else if (v.type == 2) { // karczma — потребитель
+        else if (v.type == 2) { // karczma 
             g.addEdgeById(v.global_id, "SINK", INT_MAX); // можно ограничить если надо
         }
     }
