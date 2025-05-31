@@ -76,7 +76,7 @@ public:
             addVertex(Vertex(inId, info.x, info.y, info.spec));
             addVertex(Vertex(outId, info.x, info.y, info.spec));
             vector<pair<string, int>> incoming, outgoing;
-            //krawędzie wchodzące 
+            //krawędzie wchodzące
             for (int u = 0; u < adjList.size(); ++u) {
                 for (auto& e : adjList[u]) {
                     if (e.to == info.idx && e.capacity > 0) {
@@ -94,7 +94,7 @@ public:
             if (info.type == 3) {
                 addEdgeById(inId, outId, info.spec);
             }
-            
+
             for (auto& p : incoming) addEdgeById(p.first, inId, p.second);
             for (auto& p : outgoing) addEdgeById(outId, p.first, p.second);
 
@@ -212,7 +212,74 @@ int edmondsKarp(Graph& g, const string& sourceId, const string& sinkId) {
 }
 
 
+bool pointOnSegment(int px, int py, int ax, int ay, int bx, int by) {
+    int minX = min(ax, bx), maxX = max(ax, bx);
+    int minY = min(ay, by), maxY = max(ay, by);
+    int cross = (bx - ax)*(py - ay) - (by - ay)*(px - ax);
+    if (cross != 0) return false;
+    return px >= minX && px <= maxX && py >= minY && py <= maxY;
+}
 
+struct Polygon {
+    double boost;
+    vector<pair<int, int>> points;
+
+    bool contains(int px, int py) const {
+        int count = 0;
+        int n = points.size();
+        for (int i = 0; i < n; ++i) {
+            auto [x1, y1] = points[i];
+            auto [x2, y2] = points[(i + 1) % n];
+
+            if (px == x1 && py == y1) return true; // wierzchołek
+            if (pointOnSegment(px, py, x1, y1, x2, y2)) return true;
+
+            if ((y1 > py) != (y2 > py)) {
+                double xinters = (double)(x2 - x1) * (py - y1) / (y2 - y1 + 1e-9) + x1;
+                if (px < xinters)
+                    count++;
+            }
+        }
+        return count % 2 == 1;
+    }
+};
+
+
+vector<Polygon> loadPolygonsFromFile(const string& filename) {
+    vector<Polygon> polygons;
+    ifstream in(filename);
+    if (!in) {
+        cerr << "Nie można otworzyć pliku ćwiartek: " << filename << endl;
+        return polygons;
+    }
+
+    string line;
+    while (getline(in, line)) {
+        stringstream ss(line);
+        double boost;
+        ss >> boost;
+        vector<pair<int, int>> pts;
+        int x, y;
+        while (ss >> x >> y) {
+            pts.emplace_back(x, y);
+        }
+        polygons.push_back({boost, pts});
+    }
+    return polygons;
+}
+
+void applyBoostToFields(vector<Vertex>& vertices, const vector<Polygon>& polygons) {
+    for (auto& v : vertices) {
+        if (v.type == 3) { // Pole uprawne
+            for (const auto& poly : polygons) {
+                if (poly.contains(v.x, v.y)) {
+                    v.spec = static_cast<int>(v.spec * poly.boost);
+                    break;
+                }
+            }
+        }
+    }
+}
 
 
 //тут правильно
@@ -225,6 +292,8 @@ int main() {
 
 
     g.splitVertices();
+    vector<Polygon> cwiartki = loadPolygonsFromFile("C:\\Users\\user\\Desktop\\ver30\\cwiartki.txt");
+    applyBoostToFields(g.vertices, cwiartki);
 
     // dodajemy zródłą i ujścia
     g.addVertex(Vertex("SOURCE", 0, 0, 0));
@@ -245,7 +314,7 @@ int main() {
     // łączymy ujście SINK z karczmami
     for (const auto& v : g.vertices) {
         if (v.type == 2)
-            g.addEdgeById(v.global_id, "SINK", INT_MAX); 
+            g.addEdgeById(v.global_id, "SINK", INT_MAX);
     }
 
     // łączymy browary IN z SOURCEBREWERY i SINKBREWERY z browarami OUT
@@ -290,6 +359,6 @@ int main() {
 
     cout << "Maksymalny przeplyw jeczmienia: " << maxJeczmien << endl;
     cout << "Maksymalny przeplyw piwa (nasz wynik): " << edmondsKarp(g, "SOURCEBREWERY", "SINK") << endl;
-  
+
     return 0;
 }
