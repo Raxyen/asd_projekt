@@ -10,7 +10,8 @@
 
 using namespace std;
 
-class Vertex { // wierzcholek
+// klasa reprezentująca wierzchołek
+class Vertex {
 public:
     string global_id;
     int x, y;
@@ -19,10 +20,11 @@ public:
 
     Vertex(string id, int x, int y, int spec)
         : global_id(id), x(x), y(y), spec(spec) {
-        type = global_id.back() - '0'; // typ to ostatnia cyfra ID
+        type = global_id.back() - '0'; // typ to ostatnia cyfra globalnego ID np. 0023 -> ID = 2, typ = 3
     }
 };
 
+// klasa reprezentująca krawędź (drogę)
 class Edge {
 public:
     int from, to;
@@ -36,6 +38,7 @@ public:
     }
 };
 
+// klasa reprezentująca graf
 class Graph {
 public:
     unordered_map<string, int> idToIndex; // mapuje ID (np. 0064) na indeks w wektorze
@@ -62,7 +65,7 @@ public:
     void splitVertices() {
         vector<int> toSplitIdx;
         for (int i = 0; i < vertices.size(); ++i) {
-            if (vertices[i].type == 1 || vertices[i].type == 3) { ///////!!!!!!!!!!!!!!!!!
+            if (vertices[i].type == 1 || vertices[i].type == 3) { // rozdziel na wirtualne wierzchołki in i out jeśli browar lub pole
                 toSplitIdx.push_back(i);
             }
         }
@@ -123,6 +126,9 @@ public:
     }
 };
 
+// ŁADOWANIE DANYCH Z PLIKÓW
+
+// wierzchołki
 void loadVertices(Graph& g, const string& filename) {
     ifstream in(filename);
     if (!in) {
@@ -140,6 +146,7 @@ void loadVertices(Graph& g, const string& filename) {
     }
 }
 
+// krawędzie (drogi)
 void loadEdges(Graph& g, const string& filename) { // wczytywanie dróg (krawędzi grafu) z pliku
     ifstream in(filename);
     if (!in) {
@@ -163,6 +170,8 @@ void loadEdges(Graph& g, const string& filename) { // wczytywanie dróg (krawęd
     }
 }
 
+// ALGORYTMY DO ZNAJDOWANIA PRZEPŁYWU
+// Edmonts-Karp + BFS, min cost max flow (do ceny remontu dróg i przepływu po naprawie)
 
 int bfs(Graph& g, int s, int t, vector<int>& parent, vector<int>& parentEdgeIndex) {
     fill(parent.begin(), parent.end(), -1);
@@ -279,6 +288,9 @@ int minCostFlow(Graph& g, const string& sourceId, const string& sinkId, int requ
     return flow;
 }
 
+// ALGORYTMY DO ĆWIARTEK
+// otoczka wypukła (convex hull)
+
 bool pointOnSegment(int px, int py, int ax, int ay, int bx, int by) {
     int minX = min(ax, bx), maxX = max(ax, bx);
     int minY = min(ay, by), maxY = max(ay, by);
@@ -350,8 +362,7 @@ void applyBoostToFields(vector<Vertex>& vertices, const vector<Polygon>& polygon
 
 int main() {
     Graph g;
-    ofstream output;
-    output.open("output.txt");
+    ofstream output("output.txt");
 
     // Podaj ścieżki do plików z danymi
     loadVertices(g, "struktury.txt");
@@ -361,18 +372,17 @@ int main() {
     vector<Polygon> cwiartki = loadPolygonsFromFile("cwiartki.txt");
     applyBoostToFields(g.vertices, cwiartki);
 
-    // dodajemy zródłą i ujścia
+    // dodajemy zródła i ujścia
     g.addVertex(Vertex("SOURCE", 0, 0, 0));
     g.addVertex(Vertex("SINK", 0, 0, 0));
     g.addVertex(Vertex("SOURCEBREWERY", 0, 0, 0));
     g.addVertex(Vertex("SINKBREWERY", 0, 0, 0));
 
-    // łączymy zródło SOURCE z wierzchołkami pol IN
+    // łączymy zródło SOURCE z wierzchołkami wirtualnymi IN pól uprawnych
     for (const auto& v : g.vertices) {
         if (v.global_id == "SOURCE" || v.global_id == "SINK" || v.global_id == "SOURCEBREWERY" || v.global_id == "SINKBREWERY") continue;
         // Only consider 'In' vertices for type 3
-        if (v.global_id.size() > 2 && v.global_id.substr(v.global_id.size() - 2) == "In" &&
-            v.global_id[v.global_id.size() - 3] == '3') {
+        if (v.global_id.size() > 2 && v.global_id.substr(v.global_id.size() - 2) == "In" && v.global_id[v.global_id.size() - 3] == '3') {
             g.addEdgeById("SOURCE", v.global_id, v.spec);
         }
     }
@@ -383,16 +393,12 @@ int main() {
             g.addEdgeById(v.global_id, "SINK", INT_MAX);
     }
 
-
-    ///////////////////
-    // łączymy browary IN z SOURCEBREWERY i SINKBREWERY z browarami OUT
+    // łączymy wierzchołki wirtualne browarów IN z SOURCEBREWERY i SINKBREWERY z wierzchołkami wirtualnymi OUT browarów
     for (const auto& v : g.vertices) {
-        if (v.global_id.size() > 2 && v.global_id.substr(v.global_id.size() - 2) == "In" &&
-            v.global_id[v.global_id.size() - 3] == '1') {
+        if (v.global_id.size() > 2 && v.global_id.substr(v.global_id.size() - 2) == "In" && v.global_id[v.global_id.size() - 3] == '1') {
             g.addEdgeById(v.global_id, "SOURCEBREWERY", v.spec);
         }
-        if (v.global_id.size() > 3 && v.global_id.substr(v.global_id.size() - 3) == "Out" &&
-            v.global_id[v.global_id.size() - 4] == '1') {
+        if (v.global_id.size() > 3 && v.global_id.substr(v.global_id.size() - 3) == "Out" && v.global_id[v.global_id.size() - 4] == '1') {
             g.addEdgeById("SINKBREWERY", v.global_id, v.spec);
         }
     }
@@ -430,6 +436,7 @@ int main() {
         }
     }
 
+    cout << "--------------------------------------------------------------------" << endl;
     cout << "Maksymalny przeplyw jeczmienia: " << maxJeczmien << endl;
     output << "Maksymalny przeplyw jeczmienia: " << maxJeczmien << endl;
     int maxFlow = edmondsKarp(g, "SOURCEBREWERY", "SINK");
@@ -449,5 +456,6 @@ int main() {
     output << "Uzyskana przepustowosc po naprawie drog: " << achievedFlow << endl;
     cout << "Koszt naprawy drog potrzebnych do osiagniecia przeplywu: " << totalRepairCost << endl;
     output << "Koszt naprawy drog potrzebnych do osiagniecia przeplywu: " << totalRepairCost << endl;
+    output.close();
     return 0;
 }
