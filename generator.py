@@ -99,7 +99,18 @@ def generuj_graf(params):
             najblizsze = min(lista_skrzyz, key=lambda x: (struct_x - x[1]) ** 2 + (struct_y - x[2]) ** 2)
             skrzyz_id = najblizsze[0]
             przepustowosc = randint(CROSS_CAPACITY_MIN, CROSS_CAPACITY_MAX)
-            drogi.write(f'{skrzyz_id} {struct_id} {przepustowosc} {0}\n')
+            if randint(0,100)<ZNISZCZONE_DROGI_PERCENTAGE:
+                zniszczenie = randint(MIN_KOSZT_NAPRAWY_DROGI,MAX_KOSZT_NAPRAWY_DROGI)
+            match struct_id[-1]:
+                case "1":
+                    if skrzyz_id[-1]=="4":
+                        drogi.write(f'{skrzyz_id} {struct_id} {przepustowosc} {zniszczenie}\n')
+                    else:
+                        drogi.write(f'{struct_id} {skrzyz_id} {przepustowosc} {zniszczenie}\n')
+                case "2":
+                        drogi.write(f'{skrzyz_id} {struct_id} {przepustowosc} {zniszczenie}\n')
+                case "3":
+                        drogi.write(f'{struct_id} {skrzyz_id} {przepustowosc} {zniszczenie}\n')
             licznik_krawedzi[skrzyz_id] += 1
 
 
@@ -175,6 +186,7 @@ def generuj_graf(params):
             if randint(0,100)<ZNISZCZONE_DROGI_PERCENTAGE:
                 zniszczenie = randint(MIN_KOSZT_NAPRAWY_DROGI,MAX_KOSZT_NAPRAWY_DROGI)
             drogi.write(f'{a} {b} {p} {zniszczenie}\n')
+            drogi.write(f'{b} {a} {p} {zniszczenie}\n')
 
     def convex_hull(points):
         points = sorted(set(points))
@@ -197,7 +209,11 @@ def generuj_graf(params):
                         otoczka = convex_hull(punkty)
                         boost = round(randint(MIN_BOOST_CWIARTKI, MAX_BOOST_CWIARTKI) / 100, 2)
                         f.write(f"{boost} " + " ".join(f"{x} {y}" for x, y in otoczka) + "\n")
-
+    def sortuj_drogi(): 
+        kolejnosc_par = [('3','4'), ('4','4'), ('4','1'), ('1','5'), ('5','5'), ('5','2')]
+        with open('drogi.txt', 'r') as f:lines = f.readlines()
+        with open('drogi.txt', 'w') as f:
+            f.writelines(sorted(lines,key=lambda line: kolejnosc_par.index((line.split()[0][-1], line.split()[1][-1]))))
     create_struct()
     licznik_krawedzi_skrzyzowan = {i[0]: 0 for i in lista_skrzyzowan}
     connect_to_crossroads(lista_skrzyzowan,lista_nieskrzyzowan,licznik_krawedzi_skrzyzowan)
@@ -209,4 +225,6 @@ def generuj_graf(params):
 
     zapisz_cwiartki()
     drogi.close()
+    sortuj_drogi()
+    
 
