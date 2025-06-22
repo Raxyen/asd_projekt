@@ -1,8 +1,8 @@
 from random import randint, sample, seed
 from math import ceil, sqrt, cos, sin, pi
-global_id = 0
 def generuj_graf(params):
     seed(params["SEED"])
+    global_id = 0
     # ---config---
     MIN_SPEC_POLE = params["MIN_SPEC_POLE"]
     MAX_SPEC_POLE = params["MAX_SPEC_POLE"]
@@ -56,7 +56,7 @@ def generuj_graf(params):
     cwiartki = [[[] for _ in range(PODZIAL_X)] for _ in range(PODZIAL_Y)]
 
     def create_rand(typ):  # generowanie struktur
-        global global_id
+        nonlocal global_id
         x, y = randint(0, l), randint(0, l)
         while ([x, y]) in koordynat:
             x, y = randint(0, l), randint(0, l)
@@ -99,6 +99,7 @@ def generuj_graf(params):
             najblizsze = min(lista_skrzyz, key=lambda x: (struct_x - x[1]) ** 2 + (struct_y - x[2]) ** 2)
             skrzyz_id = najblizsze[0]
             przepustowosc = randint(CROSS_CAPACITY_MIN, CROSS_CAPACITY_MAX)
+            zniszczenie = 0
             if randint(0,100)<ZNISZCZONE_DROGI_PERCENTAGE:
                 zniszczenie = randint(MIN_KOSZT_NAPRAWY_DROGI,MAX_KOSZT_NAPRAWY_DROGI)
             match struct_id[-1]:
