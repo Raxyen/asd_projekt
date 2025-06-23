@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <string>
 #include <fstream>
 using namespace std;
@@ -47,14 +47,16 @@ public:
     string algorytmBM(string slowo) {
         // alfabet uzyty {a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z}
         int LAST[26];
-        for (int pom = 0; pom < 26; pom++) {
+        for (int pom = 0; pom < 25; pom++) {
             LAST[pom] = -1;
         }
         string linia = "";
         string wynik = "";
         int liniaNum = 0;
         for (int pom = 0; pom < slowo.length(); pom++) {
-            LAST[(int)tolower(slowo[pom]) - (int)'a'] = pom;
+            if (((int)tolower(slowo[pom]) - (int)'a')<26 && ((int)tolower(slowo[pom]) - (int)'a')>=0) {
+                LAST[(int)tolower(slowo[pom]) - (int)'a'] = pom;
+            }
             //cout << slowo[pom] << LAST[(int)slowo[pom] - (int)'a'];
         }
         int i, j;
