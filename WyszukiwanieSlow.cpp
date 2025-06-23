@@ -73,7 +73,7 @@ public:
                     while ((j >= 0) && (tolower(slowo[j]) == tolower(linia[i + j]))) {
                         j--;
                     }
-                    if (j > 0) {
+                    if (j >= 0) {
                         //cout << linia << endl;
                         i += max(1, j - LAST[(int)tolower(linia[i + j]) - (int)'a']);
                         //cout << LAST[(int)linia[i + j] - (int)'a'] << endl;
